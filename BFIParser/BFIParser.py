@@ -13,6 +13,31 @@ TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/nov
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/london'
 TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20101119'
 
+class BFIEvent(object):
+    def __init__(self, title=None, precis=None, description=None, showings=[]):
+        self.title = title
+        self.precis = precis
+        self.description = description
+        self.showings = showings
+
+    def __unicode__(self):
+        return "Title:%s, Precis:%s, Desc:%s" % (self.title, self.precis, self.description)
+
+    def add_showing(self, id, location, start, end):
+        showing = BFIShowing(id, location, start, end)
+        self.showings.append(showing)
+
+class BFIShowing(object):
+    def __init__(self, id, location, start, end):
+        self.id = id
+        self.location = location
+        self.start = start
+        self.end = end
+
+    def __unicode__(self):
+        return "ID:%s Location:%s Start:%s End:%s" % (self.id, self.location, self.start, self.end)
+
+
 def daterange(start_date, end_date):
     for n in range((end_date - start_date).days):
         yield start_date + timedelta(n)
@@ -102,10 +127,15 @@ def parse_event_page(url):
                     showingid = parse_ident(dates_line.contents[1]['href'])
                     showings.append((showingid, showingloc, showingdate, showingend))
 
-    print "Title:%s Precis:%s" % (title, precis)
-    print description
+    event = BFIEvent(title=title, precis=precis, description=description)
+
     for showing in showings:
-        print "ID:%s Location:%s Start:%s End:%s" % showing
+        event.add_showing(*showing)
+
+    return event
 
 if __name__ == '__main__':
-    print parse_listings_page(TEST_LISTING_URL)
+    event = parse_event_page(TEST_EVENT_URL)
+    print unicode(event)
+    for showing in event.showings:
+        print unicode(showing)

@@ -14,6 +14,10 @@ class ListingsHandler(webapp.RequestHandler):
             taskqueue.add(url='/tasks/process_event_url', params={'url': url}, queue_name='background-queue')
             self.response.out.write(url)
 
+class EventHandler(webapp.RequestHandler):
+    def post(self):
+        BFIParser.parse_event_page(self.request.get('url'))
+
 
 def main():
     logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.WARN)
