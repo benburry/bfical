@@ -4,5 +4,12 @@ runtime: python
 api_version: 1
 
 handlers:
+- url: /tasks/.*
+  script: tasks.py
+  login: admin
+
 - url: .*
   script: main.py
+
+
+

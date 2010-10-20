@@ -1,0 +1,3 @@
+queue:
+- name: background-queue
+  rate: 1/s

@@ -4,7 +4,8 @@ from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from BeautifulSoup import BeautifulSoup
 
-LISTING_BASE_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/%s'
+LISTING_BASE_URL = 'http://www.bfi.org.uk'
+LISTING_PATH_TMPL = '%s/whatson/calendar/southbank/day/%%s' % LISTING_BASE_URL
 
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/it_happened_one_night'
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/regular_strands/studio_screenings/police_adjective'
@@ -45,7 +46,7 @@ def generate_listing_urls():
     TODAY = date.today()
     listings = []
     for day in daterange(TODAY, TODAY + relativedelta(months=+2, day=1)):
-        listings.append(LISTING_BASE_URL % day.strftime('%Y%m%d'))
+        listings.append(LISTING_PATH_TMPL % day.strftime('%Y%m%d'))
     return listings
 
 def parse_listings_page(url):
@@ -53,7 +54,7 @@ def parse_listings_page(url):
 
     events = []
     for listing in soup.findAll('li', 'event'):
-        events.append(listing.a['href'])
+        events.append(LISTING_BASE_URL + listing.a['href'])
     return events
 
 def parse_event_page(url):

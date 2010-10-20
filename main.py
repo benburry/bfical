@@ -16,42 +16,31 @@
 #
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
+from google.appengine.api.labs import taskqueue
 
-import urllib2
 import logging
 import os
 
-from BeautifulSoup import BeautifulSoup
 from icalendar.cal import Event
+from BFIParser import BFIParser
 
 
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
 
-BFI_BASEURL = 'http://www.bfi.org.uk'
-
 class MainHandler(webapp.RequestHandler):
     def get(self):
-        page = urllib2.urlopen("%s/whatson/calendar/southbank/day/20101029" % BFI_BASEURL)
-        soup = BeautifulSoup(page)
-        page.close()
-
-        for event in soup.findAll('li', attrs={'class': 'event'}):
-            self.response.out.write('%s - %s' % (event.a.renderContents(), event.find('p', 'event_time').contents[0]))
-
-#            calevent = Event()
-#            calevent.add('uid', '%s@bfi.org.uk.whatson' % event['id'])
-#            calevent.add('summary', event.a.renderContents())
-#            calevent.add('description', 'Hello dave')
-#            calevent.add('location', event.find('p', 'event_time').contents[0])
-#	        calevent.add('dtstart', datetime.datetime.fromtimestamp((eventdetails['start'] + cal['tz']) / 1000))
-#            calevent.add('sequence', int(time.time()))
-
+        listing_urls = BFIParser.generate_listing_urls()
+        for url in listing_urls:
+            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue')
+        self.response.out.write(listing_urls)
 
 
 def main():
     logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.WARN)
 
-    application = webapp.WSGIApplication([('/', MainHandler)], debug=DEBUG)
+    application = webapp.WSGIApplication([
+                                            ('/', MainHandler),
+                                         ], debug=DEBUG)
     util.run_wsgi_app(application)
 
 
