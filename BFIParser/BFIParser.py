@@ -10,18 +10,23 @@ LISTING_PATH_TMPL = '%s/whatson/calendar/southbank/day/%%s' % LISTING_BASE_URL
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/it_happened_one_night'
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/regular_strands/studio_screenings/police_adjective'
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/african_odysseys/new_nigeria_cinema_the_figurine'
-TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/london'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/london'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/submarine'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/a_day_in_the_life_four_portraits_of_postwar_britain'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/african_odysseys/african_odysseys_the_negro_soldier_discussion'
+TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/projecting_the_archive_/_capital_tales/projecting_the_archive_i_was_happy_here'
 TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20101119'
 
 class BFIEvent(object):
-    def __init__(self, title=None, precis=None, description=None, showings=[]):
+    def __init__(self, url=None, title=None, precis=None, description=None, showings=[]):
+        self.url = url
         self.title = title
         self.precis = precis
         self.description = description
         self.showings = showings
 
     def __unicode__(self):
-        return "Title:%s, Precis:%s, Desc:%s" % (self.title, self.precis, self.description)
+        return (u"Title:%s, Precis:%s, Desc:%s" % (self.title, self.precis, self.description)).encode("utf-8")
 
     def add_showing(self, id, location, start, end):
         showing = BFIShowing(id, location, start, end)
@@ -35,7 +40,7 @@ class BFIShowing(object):
         self.end = end
 
     def __unicode__(self):
-        return "ID:%s Location:%s Start:%s End:%s" % (self.id, self.location, self.start, self.end)
+        return (u"ID:%s Location:%s Start:%s End:%s" % (self.id, self.location, self.start, self.end)).encode("utf-8")
 
 
 def daterange(start_date, end_date):
@@ -93,10 +98,11 @@ def parse_event_page(url):
             description = p.string
             break
 
+    running_time = 1
     for row in precis.findNext('table', 'credits_list'):
         if row.find('td', 'credit_role').string == 'Running time':
             runningstr = row.find('td', 'credit_content').string
-            match = re.match(r'(\d+)min', runningstr)
+            match = re.search(r'(\d+)min', runningstr)
             if match: running_time = int(match.group(1))
             break
     running_delta = timedelta(minutes=running_time)
@@ -127,7 +133,7 @@ def parse_event_page(url):
                     showingid = parse_ident(dates_line.contents[1]['href'])
                     showings.append((showingid, showingloc, showingdate, showingend))
 
-    event = BFIEvent(title=title, precis=precis, description=description)
+    event = BFIEvent(url=url, title=title, precis=precis, description=description)
 
     for showing in showings:
         event.add_showing(*showing)

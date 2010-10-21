@@ -31,7 +31,7 @@ class MainHandler(webapp.RequestHandler):
     def get(self):
         listing_urls = BFIParser.generate_listing_urls()
         for url in listing_urls:
-            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue')
+            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue', countdown=1)
         self.response.out.write(listing_urls)
 
 
