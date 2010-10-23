@@ -1,5 +1,6 @@
 import urllib2
 import re
+import logging
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from BeautifulSoup import BeautifulSoup
@@ -15,18 +16,26 @@ TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/nov
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/a_day_in_the_life_four_portraits_of_postwar_britain'
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/african_odysseys/african_odysseys_the_negro_soldier_discussion'
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/projecting_the_archive_/_capital_tales/projecting_the_archive_i_was_happy_here'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/regular_strands/previews_in_conversation/preview_another_year_mike_leig'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/missing_believed_wiped_session_1_music_miscellany'
+#TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/african_odysseys_cy_grant_tribute'
+TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/clandest%C3%AD_invisible_catalan_cinema_under_franco/countr'
+TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/the_way_of_the_strong'
+
 TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20101119'
 
 class BFIEvent(object):
-    def __init__(self, url=None, title=None, precis=None, description=None, showings=[]):
-        self.url = url
-        self.title = title
-        self.precis = precis
-        self.description = description
+    def __init__(self, url=None, title=None, precis=None, description=None, showings=None):
+        self.url = unicode(url).encode('ascii', 'ignore')
+        self.title = unicode(title).encode('ascii', 'ignore')
+        self.precis = unicode(precis).encode('ascii', 'ignore')
+        self.description = unicode(description).encode('ascii', 'ignore')
         self.showings = showings
+        if self.showings is None: self.showings = []
+
 
     def __unicode__(self):
-        return (u"Title:%s, Precis:%s, Desc:%s" % (self.title, self.precis, self.description)).encode("utf-8")
+        return u"Title:%s, Precis:%s, Desc:%s" % (self.title, self.precis, self.description)
 
     def add_showing(self, id, location, start, end):
         showing = BFIShowing(id, location, start, end)
@@ -35,12 +44,12 @@ class BFIEvent(object):
 class BFIShowing(object):
     def __init__(self, id, location, start, end):
         self.id = id
-        self.location = location
+        self.location = unicode(location).encode('ascii', 'ignore')
         self.start = start
         self.end = end
 
     def __unicode__(self):
-        return (u"ID:%s Location:%s Start:%s End:%s" % (self.id, self.location, self.start, self.end)).encode("utf-8")
+        return u"ID:%s Location:%s Start:%s End:%s" % (self.id, self.location, self.start, self.end)
 
 
 def daterange(start_date, end_date):
@@ -93,18 +102,22 @@ def parse_event_page(url):
     title = soup.find('h1', 'title').string
     precis = title.findNext('p', 'standfirst').string
 
-    for p in precis.findNext('div', id='read_more').findAll('p'):
-        if getattr(p, 'string', None):
-            description = p.string
-            break
+    description = ""
+    if precis is not None:
+        for p in precis.findNext('div', id='read_more').findAll('p'):
+            if getattr(p, 'string', None):
+                description = p.string
+                break
 
-    running_time = 1
-    for row in precis.findNext('table', 'credits_list'):
-        if row.find('td', 'credit_role').string == 'Running time':
-            runningstr = row.find('td', 'credit_content').string
-            match = re.search(r'(\d+)min', runningstr)
-            if match: running_time = int(match.group(1))
-            break
+    running_time = 60
+    infotable = precis.findNext('table', 'credits_list')
+    if infotable is not None:
+        for row in infotable:
+            if row.find('td', 'credit_role').string == 'Running time':
+                runningstr = row.find('td', 'credit_content').string
+                match = re.search(r'(\d+)min', runningstr)
+                if match: running_time = int(match.group(1))
+                break
     running_delta = timedelta(minutes=running_time)
 
     showings = []
@@ -133,6 +146,7 @@ def parse_event_page(url):
                     showingid = parse_ident(dates_line.contents[1]['href'])
                     showings.append((showingid, showingloc, showingdate, showingend))
 
+    logging.debug("Showings:%s" % len(showings))
     event = BFIEvent(url=url, title=title, precis=precis, description=description)
 
     for showing in showings:
