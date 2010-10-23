@@ -16,30 +16,47 @@
 #
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
-from google.appengine.api.labs import taskqueue
+from google.appengine.api import memcache
 
 import logging
 import os
-
-from icalendar.cal import Event
-from BFIParser import BFIParser
+import tasks
 
 
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
 
 class MainHandler(webapp.RequestHandler):
     def get(self):
-        listing_urls = BFIParser.generate_listing_urls()
-        for url in listing_urls:
-            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue', countdown=1)
-        self.response.out.write(listing_urls)
+        handler = tasks.UpdateHandler()
+        handler.initialize(self.request, self.response)
+        handler.post()
 
+        #for showing in db.Query(Showing).filter("start >=", date.today()):
+        #    self.response.out.write(unicode(showing))
+
+class SouthBankHandler(webapp.RequestHandler):
+    def get(self):
+
+        calendar = None
+        if not DEBUG:
+            calendar = memcache.get(tasks.CACHEKEY)
+
+        if calendar is None:
+            calendar = tasks.generate_calendar()
+            memcache.set(tasks.CACHEKEY, calendar)
+
+        if calendar is not None:
+            self.response.headers['Content-Type'] = "text/calendar"
+            self.response.out.write(calendar.as_string())
+        else:
+            self.error(404)
 
 def main():
     logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.WARN)
 
     application = webapp.WSGIApplication([
                                             ('/', MainHandler),
+                                            ('/southbank/ics', SouthBankHandler),
                                          ], debug=DEBUG)
     util.run_wsgi_app(application)
 

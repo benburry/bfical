@@ -6,37 +6,72 @@ from google.appengine.api import memcache
 from google.appengine.ext import db
 from models import Event, Showing
 from datetime import date
+from icalendar.cal import Calendar, Event as CalEvent
+import time
 import logging
 import os
 
 
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
 QUEUE_RETRY = 5
+CACHEKEY = 'cal-%s' % 'southbank'
 
+def generate_calendar():
+    calendar = Calendar()
+    calendar.add('prodid', '-//BFiCal Calendar//bfical.com//')
+    calendar.add('version', '2.0')
+
+    for showing in db.Query(Showing).filter("start >=", date.today()):
+        calevent = CalEvent()
+        calevent.add('uid', '%s@bfical.com' % showing.ident)
+        calevent.add('summary', showing.parent().name)
+        calevent.add('description', showing.parent().description)
+        calevent.add('location', '%s, %s' % (showing.location, showing.parent().location.capitalize()))
+        calevent.add('dtstart', showing.start)
+        calevent.add('dtend', showing.end)
+        calevent.add('url', showing.parent().src_url)
+        calevent.add('sequence', int(time.time())) # TODO - fix
+        #calevent.add('dtstamp', datetime.datetime.now())
+        calendar.add_component(calevent)
+
+    return calendar
 
 def continue_processing_task(request):
     retrycount = request.headers['X-AppEngine-TaskRetryCount']
+    logging.debug("Queue retry count:%s" % retrycount)
     return not(retrycount is not None and int(retrycount) > QUEUE_RETRY)
 
 class UpdateHandler(webapp.RequestHandler):
     def post(self):
         listing_urls = BFIParser.generate_listing_urls()
-        for url in listing_urls[0]:
-            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue', countdown=1)
+        countdown = 1
+        for url in listing_urls:
+            logging.debug("Queueing listing url:%s" % url)
+            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue', countdown=countdown)
+            countdown = countdown + 1
         self.response.out.write(listing_urls)
-        # Send out queued task for clearing event non-updated showing past today after all processing complete
+
+        taskqueue.add(url='/tasks/generate_calendar', countdown=600)
+        # TODO - Send out queued task for clearing events non-updated showing past today after all processing complete
 
 class ListingsHandler(webapp.RequestHandler):
     def post(self):
         if continue_processing_task(self.request):
             urls = BFIParser.parse_listings_page(self.request.get('url'))
+            countdown = 1
             for url in urls:
                 if memcache.get(url) is None:
                     memcache.set(url, 1, time=1200)
-                    taskqueue.add(url='/tasks/process_event_url', params={'url': url}, queue_name='background-queue', countdown=1)
+                    logging.debug("Queueing event url:%s" % url)
+                    taskqueue.add(url='/tasks/process_event_url', params={'url': url}, queue_name='background-queue', countdown=countdown)
+                    countdown = countdown + 1
                     self.response.out.write(url)
                 else:
                     logging.debug("Already process(ed|ing) url %s" % url)
+
+class GenerateHandler(webapp.RequestHandler):
+    def post(self):
+        memcache.set(CACHEKEY, generate_calendar())
 
 class EventHandler(webapp.RequestHandler):
     def post(self):
@@ -71,6 +106,7 @@ class EventHandler(webapp.RequestHandler):
                                   description=bfievent.description)
 
             db.run_in_transaction(persist_events, event, bfievent)
+            logging.debug("Processed event url %s" % eventurl)
 
 
 def main():
@@ -80,6 +116,7 @@ def main():
                                             ('/tasks/update', UpdateHandler),
                                             ('/tasks/process_listings_url', ListingsHandler),
                                             ('/tasks/process_event_url', EventHandler),
+                                            ('/tasks/generate_calendar', GenerateHandler),
                                          ], debug=DEBUG)
     util.run_wsgi_app(application)
 
