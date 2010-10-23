@@ -43,6 +43,7 @@ def continue_processing_task(request):
 
 class UpdateHandler(webapp.RequestHandler):
     def post(self):
+        memcache.set(CACHEKEY, generate_calendar(), time=1200)
         listing_urls = BFIParser.generate_listing_urls()
         countdown = 1
         for url in listing_urls:
@@ -51,7 +52,7 @@ class UpdateHandler(webapp.RequestHandler):
             countdown = countdown + 1
         self.response.out.write(listing_urls)
 
-        taskqueue.add(url='/tasks/generate_calendar', countdown=600)
+        taskqueue.add(url='/tasks/generate_calendar', countdown=1200)
         # TODO - Send out queued task for clearing events non-updated showing past today after all processing complete
 
 class ListingsHandler(webapp.RequestHandler):

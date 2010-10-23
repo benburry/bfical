@@ -17,6 +17,7 @@
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 from google.appengine.api import memcache
+from google.appengine.ext.webapp import template
 
 import logging
 import os
@@ -27,12 +28,8 @@ DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv
 
 class MainHandler(webapp.RequestHandler):
     def get(self):
-        handler = tasks.UpdateHandler()
-        handler.initialize(self.request, self.response)
-        handler.post()
-
-        #for showing in db.Query(Showing).filter("start >=", date.today()):
-        #    self.response.out.write(unicode(showing))
+        path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
+        self.response.out.write(template.render(path, {}))
 
 class SouthBankHandler(webapp.RequestHandler):
     def get(self):
@@ -43,7 +40,7 @@ class SouthBankHandler(webapp.RequestHandler):
 
         if calendar is None:
             calendar = tasks.generate_calendar()
-            memcache.set(tasks.CACHEKEY, calendar)
+            memcache.set(tasks.CACHEKEY, calendar, time=1200)
 
         if calendar is not None:
             self.response.headers['Content-Type'] = "text/calendar"
