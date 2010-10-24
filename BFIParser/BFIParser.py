@@ -1,12 +1,17 @@
 import urllib2
 import re
 import logging
+import time
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from BeautifulSoup import BeautifulSoup
+import robotparser
 
 LISTING_BASE_URL = 'http://www.bfi.org.uk'
 LISTING_PATH_TMPL = '%s/whatson/calendar/southbank/day/%%s' % LISTING_BASE_URL
+
+USER_AGENT = 'BFiCal'
+robot_parser = None
 
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/it_happened_one_night'
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/regular_strands/studio_screenings/police_adjective'
@@ -23,6 +28,7 @@ TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/nov
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/the_way_of_the_strong'
 
 TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20101119'
+
 
 class BFIEvent(object):
     def __init__(self, url=None, title=None, precis=None, description=None, showings=None):
@@ -51,6 +57,17 @@ class BFIShowing(object):
     def __unicode__(self):
         return u"ID:%s Location:%s Start:%s End:%s" % (self.id, self.location, self.start, self.end)
 
+def can_access_url(url):
+    global robot_parser
+    if robot_parser is None:
+        robot_parser = robotparser.RobotFileParser()
+        robot_parser.set_url("%s/robots.txt" % LISTING_BASE_URL)
+
+    if time.time() - robot_parser.mtime() >= 3600:
+        robot_parser.read()
+        robot_parser.modified()   # wonder what the point is if it doesn't maintain last_checked itself
+
+    return robot_parser.can_fetch(USER_AGENT, url)
 
 def daterange(start_date, end_date):
     for n in range((end_date - start_date).days):
@@ -75,9 +92,13 @@ def parse_ident(identstr):
     return showingid
 
 def parse_url(url):
-    page = urllib2.urlopen(url)
-    soup = BeautifulSoup(page, convertEntities=BeautifulSoup.HTML_ENTITIES)
-    page.close()
+    if can_access_url(url):
+        req = urllib2.Request(url, headers={'User-Agent': USER_AGENT})
+        page = urllib2.urlopen(req)
+        soup = BeautifulSoup(page, convertEntities=BeautifulSoup.HTML_ENTITIES)
+        page.close()
+    else:
+        logging.error("robots.txt denied access to %s" % url)
 
     return soup
 

@@ -100,11 +100,11 @@ class EventHandler(webapp.RequestHandler):
                                 end=showing.end).put()
 
             event = Event.get_or_insert(key_name=bfievent.url,
-                                  src_url=db.Link(bfievent.url),
-                                  location='southbank', #TODO - changeme
-                                  name=bfievent.title,
-                                  precis=bfievent.precis,
-                                  description=bfievent.description)
+                                        src_url=db.Link(bfievent.url),
+                                        location='southbank', #TODO - changeme
+                                        name=bfievent.title,
+                                        precis=bfievent.precis,
+                                        description=bfievent.description)
 
             db.run_in_transaction(persist_events, event, bfievent)
             logging.debug("Processed event url %s" % eventurl)
