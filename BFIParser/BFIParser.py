@@ -10,6 +10,8 @@ import robotparser
 LISTING_BASE_URL = 'http://www.bfi.org.uk'
 LISTING_PATH_TMPL = '%s/whatson/calendar/southbank/day/%%s' % LISTING_BASE_URL
 
+LOCATIONS = ['southbank',]
+
 USER_AGENT = 'BFiCal'
 robot_parser = None
 
@@ -31,17 +33,22 @@ TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/2010111
 
 
 class BFIEvent(object):
-    def __init__(self, url=None, title=None, precis=None, description=None, showings=None):
+    def __init__(self, url=None, title=None, precis=None, description=None, directors=None, cast=None, year=None, showings=None):
         self.url = unicode(url).encode('ascii', 'ignore')
         self.title = unicode(title).encode('ascii', 'ignore')
         self.precis = unicode(precis).encode('ascii', 'ignore')
         self.description = unicode(description).encode('ascii', 'ignore')
+        self.directors = directors
+        if self.directors is None: self.directors = []
+        self.cast = cast
+        if self.cast is None: self.cast = []
+        self.year = year
         self.showings = showings
         if self.showings is None: self.showings = []
 
 
     def __unicode__(self):
-        return u"Title:%s, Precis:%s, Desc:%s" % (self.title, self.precis, self.description)
+        return u"Title:%s, Precis:%s, Year:%s, Director:%s, Cast:%s, Desc:%s" % (self.title, self.precis, self.year, ', '.join(self.directors), ', '.join(self.cast), self.description)
 
     def add_showing(self, id, location, start, end):
         showing = BFIShowing(id, location, start, end)
@@ -92,6 +99,7 @@ def parse_ident(identstr):
     return showingid
 
 def parse_url(url):
+    url = str(url)
     if can_access_url(url):
         req = urllib2.Request(url, headers={'User-Agent': USER_AGENT})
         page = urllib2.urlopen(req)
@@ -131,10 +139,25 @@ def parse_event_page(url):
                 break
 
     running_time = 60
+    director_list = []
+    cast_list = []
+    year = None
+
     infotable = precis.findNext('table', 'credits_list')
     if infotable is not None:
         for row in infotable:
-            if row.find('td', 'credit_role').string == 'Running time':
+            rowtitle = row.find('td', 'credit_role').string
+            if rowtitle == 'Director':
+                directors = row.find('td', 'credit_content').string
+                if directors is not None:
+                    director_list = [unicode(x).strip() for x in directors.split(',')]
+            elif rowtitle == 'Cast':
+                casts = row.find('td', 'credit_content').string
+                if casts is not None:
+                    cast_list = [unicode(x).strip() for x in casts.split(',')]
+            elif rowtitle == 'Year':
+                year = unicode(row.find('td', 'credit_content').string)
+            elif rowtitle == 'Running time':
                 runningstr = row.find('td', 'credit_content').string
                 match = re.search(r'(\d+)min', runningstr)
                 if match: running_time = int(match.group(1))
@@ -168,7 +191,7 @@ def parse_event_page(url):
                     showings.append((showingid, showingloc, showingdate, showingend))
 
     logging.debug("Showings:%s" % len(showings))
-    event = BFIEvent(url=url, title=title, precis=precis, description=description)
+    event = BFIEvent(url=url, title=title, precis=precis, directors=director_list, cast=cast_list, year=year, description=description)
 
     for showing in showings:
         event.add_showing(*showing)

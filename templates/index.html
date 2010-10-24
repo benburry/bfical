@@ -1,6 +1,10 @@
-<html>
-<head><title>BFiCal</title></head>
-<body>
-<iframe src="http://www.google.com/calendar/hosted/burry.name/embed?title=BFI%20Southbank&amp;showCalendars=0&amp;mode=AGENDA&amp;height=600&amp;wkst=2&amp;hl=en_GB&amp;bgcolor=%23FFFFFF&amp;src=0npu2i25mf322k6vbpivjdl3ar258qvf%40import.calendar.google.com&amp;color=%235C1158&amp;ctz=Europe%2FLondon" style=" border-width:0 " width="800" height="600" frameborder="0" scrolling="no"></iframe>
-</body>
-</html>
+{% extends "base.html" %}
+{% block body %}
+<ul>{% for showing in showings %}
+<!--iframe src="http://www.google.com/calendar/hosted/burry.name/embed?title=BFI%20Southbank&amp;showCalendars=0&amp;mode=AGENDA&amp;height=600&amp;wkst=2&amp;hl=en_GB&amp;bgcolor=%23FFFFFF&amp;src=0npu2i25mf322k6vbpivjdl3ar258qvf%40import.calendar.google.com&amp;color=%235C1158&amp;ctz=Europe%2FLondon" style=" border-width:0 " width="800" height="600" frameborder="0" scrolling="no"></iframe-->
+    {% ifchanged showing.start.month %}
+    <li>{{ showing.start|date:"F" }}</li>
+    {% endifchanged %}
+    <li>{{ showing.start|date:"D jS H:i" }}-{{ showing.end|date:"D jS H:i" }} <a href="/event/{{ showing.parent.key }}">{{ showing.parent.name }}</a> {{ showing.location }}</li>
+{% endfor %}</ul>
+{% endblock %}

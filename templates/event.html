@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %} BFiCal - {{ event.name }}{% endblock %}
+{% block body %}
+    <h1>{{ event.name }}</h1>
+    <p>{{ event.precis }}</p>
+    <p>{{ event.description }}</p>
+    {% if event.year %}<p>Year: <a href="/year/{{ event.year }}">{{ event.year }}</a></p>{% endif %}
+    {% if event.directors %}<p>Director: {% for director in event.directors %}{% if not forloop.first %}, {% endif %}<a href="/more/{{ director|urlencode }}">{{ director }}</a>{% endfor %}</p>{% endif %}
+    {% if event.cast %}<p>Cast: {% for member in event.cast %}{% if not forloop.first %}, {% endif %}<a href="/more/{{ member|urlencode }}">{{ member }}</a>{% endfor %}</p>{% endif %}
+    {% for showing in showings %}
+        {% ifchanged showing.start.month %}
+    <li>{{ showing.start|date:"F" }}</li>
+    {% endifchanged %}
+    <li>{{ showing.start|date:"D jS H:i" }}-{{ showing.end|date:"D jS H:i" }} {{ showing.location }}</li>
+    {% endfor %}
+    <a href="{{ event.src_url }}" target="_blank">more...</a>
+{% endblock %}

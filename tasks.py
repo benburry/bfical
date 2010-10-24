@@ -85,7 +85,7 @@ class EventHandler(webapp.RequestHandler):
 
             def persist_events(dbevent, bfievent):
                 # Delete existing showings for this event past current date
-                db.delete(db.Query(Showing).ancestor(dbevent).filter("end >=", date.today()))
+                db.delete(db.Query(Showing).ancestor(dbevent).filter("start >=", date.today()))
 
                 # Save events
                 for showing in bfievent.showings:
@@ -104,6 +104,9 @@ class EventHandler(webapp.RequestHandler):
                                         location='southbank', #TODO - changeme
                                         name=bfievent.title,
                                         precis=bfievent.precis,
+                                        year=bfievent.year,
+                                        directors=bfievent.directors,
+                                        cast=bfievent.cast,
                                         description=bfievent.description)
 
             db.run_in_transaction(persist_events, event, bfievent)

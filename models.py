@@ -14,6 +14,9 @@ class Event(db.Model):
     location = db.StringProperty(required=True)
     name = db.StringProperty()
     precis = db.StringProperty()
+    year = db.StringProperty()
+    directors = db.StringListProperty()
+    cast = db.StringListProperty()
     description = db.TextProperty()
     updated = db.DateTimeProperty(auto_now=True)
 
