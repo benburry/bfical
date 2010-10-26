@@ -1,4 +1,8 @@
 cron:
-- description: cal refresh job
+- description: Data refresh job
   url: /tasks/update
-  schedule: every 1 hours
+  schedule: every 2 hours
+
+- description: Daily exception report
+  url: /_ereporter?sender=ben@burry.name
+  schedule: every day 00:00

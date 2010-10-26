@@ -4,46 +4,55 @@ from google.appengine.ext.webapp import util
 from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache
 from google.appengine.ext import db
+from google.appengine.ext import ereporter
 from models import Event, Showing
 from datetime import date
 from icalendar.cal import Calendar, Event as CalEvent
 import time
 import logging
 import os
+import main
 
+ereporter.register_logger()
 
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
 QUEUE_RETRY = 5
-CACHEKEY = 'cal-%s' % 'southbank'
+ICS_CACHEKEY_TMPL = 'cal-%s'
+HOME_CACHEKEY_TMPL = 'home-%s'
 
-def generate_calendar():
+def generate_calendar(location = 'southbank'):
     calendar = Calendar()
-    calendar.add('prodid', '-//BFiCal Calendar//bfical.com//')
+    caplocation = location.capitalize()
+    calendar.add('prodid', '-//BFiCal %s Calendar//bfical.com//' % caplocation)
     calendar.add('version', '2.0')
 
     for showing in db.Query(Showing).filter("start >=", date.today()):
-        calevent = CalEvent()
-        calevent.add('uid', '%s@bfical.com' % showing.ident)
-        calevent.add('summary', showing.parent().name)
-        calevent.add('description', showing.parent().description)
-        calevent.add('location', '%s, %s' % (showing.location, showing.parent().location.capitalize()))
-        calevent.add('dtstart', showing.start)
-        calevent.add('dtend', showing.end)
-        calevent.add('url', showing.parent().src_url)
-        calevent.add('sequence', int(time.time())) # TODO - fix
-        #calevent.add('dtstamp', datetime.datetime.now())
-        calendar.add_component(calevent)
+        if showing.parent().location == location:
+            calevent = CalEvent()
+            calevent.add('uid', '%s@bfical.com' % showing.ident)
+            calevent.add('summary', showing.parent().name)
+            calevent.add('description', showing.parent().description)
+            calevent.add('location', '%s, %s' % (showing.location, caplocation))
+            calevent.add('dtstart', showing.start)
+            calevent.add('dtend', showing.end)
+            calevent.add('url', showing.parent().src_url)
+            calevent.add('sequence', int(time.time())) # TODO - fix
+            #calevent.add('dtstamp', datetime.datetime.now())
+            calendar.add_component(calevent)
 
     return calendar
 
 def continue_processing_task(request):
     retrycount = request.headers['X-AppEngine-TaskRetryCount']
     logging.debug("Queue retry count:%s" % retrycount)
-    return not(retrycount is not None and int(retrycount) > QUEUE_RETRY)
+    return retrycount is None or int(retrycount) <= QUEUE_RETRY
 
 class UpdateHandler(webapp.RequestHandler):
-    def post(self):
-        memcache.set(CACHEKEY, generate_calendar(), time=1200)
+    def get(self):
+        return self.post()
+
+    def post(self, location='southbank'):
+        memcache.set(ICS_CACHEKEY_TMPL % location, generate_calendar(location), time=1800)
         listing_urls = BFIParser.generate_listing_urls()
         countdown = 1
         for url in listing_urls:
@@ -52,8 +61,21 @@ class UpdateHandler(webapp.RequestHandler):
             countdown = countdown + 1
         self.response.out.write(listing_urls)
 
-        taskqueue.add(url='/tasks/generate_calendar', countdown=1200)
+        taskqueue.add(url='/tasks/generate_calendar', countdown=1800)
         # TODO - Send out queued task for clearing events non-updated showing past today after all processing complete
+
+class PurgeHandler(webapp.RequestHandler):
+    def get(self):
+        self.post()
+
+    def post(self):
+        db.delete(Showing.all())
+        db.delete(Event.all())
+
+        handler = UpdateHandler()
+        handler.initialize(self.request, self.response)
+        handler.post()
+
 
 class ListingsHandler(webapp.RequestHandler):
     def post(self):
@@ -62,7 +84,7 @@ class ListingsHandler(webapp.RequestHandler):
             countdown = 1
             for url in urls:
                 if memcache.get(url) is None:
-                    memcache.set(url, 1, time=1200)
+                    memcache.set(url, 1, time=1800)
                     logging.debug("Queueing event url:%s" % url)
                     taskqueue.add(url='/tasks/process_event_url', params={'url': url}, queue_name='background-queue', countdown=countdown)
                     countdown = countdown + 1
@@ -72,10 +94,12 @@ class ListingsHandler(webapp.RequestHandler):
 
 class GenerateHandler(webapp.RequestHandler):
     def post(self):
-        memcache.set(CACHEKEY, generate_calendar())
+        for location in BFIParser.LOCATIONS:
+            memcache.set(HOME_CACHEKEY_TMPL % location, main.generate_homepage(location), time=86400)
+            memcache.set(ICS_CACHEKEY_TMPL % location, generate_calendar(location), time=86400)
 
 class EventHandler(webapp.RequestHandler):
-    def post(self):
+    def post(self, location='southbank'):
         if continue_processing_task(self.request):
             eventurl = self.request.get('url')
 
@@ -96,12 +120,12 @@ class EventHandler(webapp.RequestHandler):
                                 parent=dbevent,
                                 ident=showing.id,
                                 location=showing.location,
+                                master_location=location,
                                 start=showing.start,
                                 end=showing.end).put()
 
             event = Event.get_or_insert(key_name=bfievent.url,
                                         src_url=db.Link(bfievent.url),
-                                        location='southbank', #TODO - changeme
                                         name=bfievent.title,
                                         precis=bfievent.precis,
                                         year=bfievent.year,
@@ -110,6 +134,7 @@ class EventHandler(webapp.RequestHandler):
                                         description=bfievent.description)
 
             db.run_in_transaction(persist_events, event, bfievent)
+            memcache.delete(HOME_CACHEKEY_TMPL % location)
             logging.debug("Processed event url %s" % eventurl)
 
 
@@ -118,6 +143,7 @@ def main():
 
     application = webapp.WSGIApplication([
                                             ('/tasks/update', UpdateHandler),
+                                            ('/tasks/purge', PurgeHandler),
                                             ('/tasks/process_listings_url', ListingsHandler),
                                             ('/tasks/process_event_url', EventHandler),
                                             ('/tasks/generate_calendar', GenerateHandler),

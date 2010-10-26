@@ -28,16 +28,17 @@ TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/projecting_
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/african_odysseys_cy_grant_tribute'
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/clandest%C3%AD_invisible_catalan_cinema_under_franco/countr'
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/november_seasons/rediscovering_frank_capra/the_way_of_the_strong'
+TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/regular_strands/studio_screenings/metropolis'
 
 TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20101119'
 
 
 class BFIEvent(object):
     def __init__(self, url=None, title=None, precis=None, description=None, directors=None, cast=None, year=None, showings=None):
-        self.url = unicode(url).encode('ascii', 'ignore')
-        self.title = unicode(title).encode('ascii', 'ignore')
-        self.precis = unicode(precis).encode('ascii', 'ignore')
-        self.description = unicode(description).encode('ascii', 'ignore')
+        self.url = unicode(url).encode('ascii', 'xmlcharrefreplace')
+        self.title = unicode(title).encode('ascii', 'xmlcharrefreplace')
+        self.precis = unicode(precis).encode('ascii', 'xmlcharrefreplace')
+        self.description = unicode(description).encode('ascii', 'xmlcharrefreplace')
         self.directors = directors
         if self.directors is None: self.directors = []
         self.cast = cast
@@ -57,7 +58,7 @@ class BFIEvent(object):
 class BFIShowing(object):
     def __init__(self, id, location, start, end):
         self.id = id
-        self.location = unicode(location).encode('ascii', 'ignore')
+        self.location = unicode(location).encode('ascii', 'xmlcharrefreplace')
         self.start = start
         self.end = end
 
@@ -150,11 +151,11 @@ def parse_event_page(url):
             if rowtitle == 'Director':
                 directors = row.find('td', 'credit_content').string
                 if directors is not None:
-                    director_list = [unicode(x).strip() for x in directors.split(',')]
+                    director_list = [unicode(x).encode('ascii', 'xmlcharrefreplace').strip() for x in directors.split(',')]
             elif rowtitle == 'Cast':
                 casts = row.find('td', 'credit_content').string
                 if casts is not None:
-                    cast_list = [unicode(x).strip() for x in casts.split(',')]
+                    cast_list = [unicode(x).encode('ascii', 'xmlcharrefreplace').strip() for x in casts.split(',')]
             elif rowtitle == 'Year':
                 year = unicode(row.find('td', 'credit_content').string)
             elif rowtitle == 'Running time':

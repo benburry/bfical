@@ -5,10 +5,15 @@ api_version: 1
 
 builtins:
 - datastore_admin: on
+- admin_redirect: on
 
 handlers:
 - url: /tasks/.*
   script: tasks.py
+  login: admin
+
+- url: /_ereporter.*
+  script: $PYTHON_LIB/google/appengine/ext/ereporter/report_generator.py
   login: admin
 
 - url: .*

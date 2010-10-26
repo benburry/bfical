@@ -19,6 +19,7 @@ from google.appengine.ext.webapp import util
 from google.appengine.api import memcache
 from google.appengine.ext.webapp import template
 from google.appengine.ext import db
+from google.appengine.ext import ereporter
 from models import Event, Showing
 
 from datetime import date
@@ -29,23 +30,32 @@ import urllib
 
 
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
+ereporter.register_logger()
+
+def generate_homepage(location='southbank'):
+    showings = db.Query(Showing).filter("master_location", location).filter("start >=", date.today()).order("start")
+    path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
+    return template.render(path, {"showings": showings,})
 
 class MainHandler(webapp.RequestHandler):
     def get(self, location='southbank'):
-        showings = db.Query(Showing).filter("start >=", date.today()).order("start")   # TODO - cache this
-        path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
-        self.response.out.write(template.render(path, {"showings": showings,}))
+        cachekey = tasks.HOME_CACHEKEY_TMPL % location
+        output = memcache.get(cachekey)
+        if output is None:
+            output = generate_homepage(location)
+            memcache.set(cachekey, output, time=86400)
+        self.response.out.write(output)
 
 class ICSHandler(webapp.RequestHandler):
     def get(self, location='southbank'):
 
         calendar = None
         if not DEBUG:
-            calendar = memcache.get(tasks.CACHEKEY)
+            calendar = memcache.get(tasks.ICS_CACHEKEY_TMPL % location)
 
         if calendar is None:
             calendar = tasks.generate_calendar()
-            memcache.set(tasks.CACHEKEY, calendar, time=1200)
+            memcache.set(tasks.ICS_CACHEKEY_TMPL % location, calendar, time=86400)
 
         if calendar is not None:
             self.response.headers['Content-Type'] = "text/calendar"
@@ -93,7 +103,7 @@ def main():
                                             (r'/event/([^\/]*)$', EventHandler),
                                             (r'/year/([^\/]*)$', YearHandler),
                                             (r'/more/([^\/]*)$', MoreHandler),
-                                            (r'/([^\/]*)$', MainHandler),
+                                            (r'/$', MainHandler),
                                          ], debug=DEBUG)
     util.run_wsgi_app(application)
 
