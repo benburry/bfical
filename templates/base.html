@@ -1,7 +1,9 @@
 <html>
 <head>
     <title>{% block title %}BFiCal{% endblock %}</title>
-    {% block header %}{% endblock %}
+    {% block header %}<link type="text/css" href="/statics/css/smoothness/jquery-ui-1.8.5.custom.css" rel="stylesheet" />
+    <script type="text/javascript" src="/staticsjs/jquery-1.4.2.min.js"></script>
+    <script type="text/javascript" src="/staticsjs/jquery-ui-1.8.5.custom.min.js"></script>{% endblock %}
 </head>
 <body>
 {% block body %}{% endblock %}

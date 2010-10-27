@@ -8,6 +8,9 @@ builtins:
 - admin_redirect: on
 
 handlers:
+- url: /statics
+  static_dir: statics
+
 - url: /tasks/.*
   script: tasks.py
   login: admin
