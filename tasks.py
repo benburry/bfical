@@ -73,7 +73,7 @@ class UpdateHandler(webapp.RequestHandler):
         self.response.out.write(listing_urls)
 
         taskqueue.add(url='/tasks/generate_calendar', countdown=1800)
-        # TODO - Send out queued task for clearing events non-updated showing past today after all processing complete
+
 
 class PurgeHandler(webapp.RequestHandler):
     def get(self):
