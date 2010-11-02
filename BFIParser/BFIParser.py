@@ -63,13 +63,13 @@ def daterange(start_date, end_date):
     for n in range((end_date - start_date).days):
         yield start_date + timedelta(n)
 
-def parse_dates(datestr='', running_delta=timedelta(minutes=1)):
+def parse_dates(datestr='', running_delta=timedelta(minutes=1), year=datetime.today().year):
     match = None
     if datestr: match = re.search(r'(\d+\s\w{3}\s\d{2}:\d{2})', datestr)
     if match:
         showingdate = datetime.strptime(match.group(1), '%d %b %H:%M')
         if showingdate:
-            showingdate = showingdate.replace(year=datetime.today().year) #TODO - year of target page
+            showingdate = showingdate.replace(year=year)
             showingenddate = showingdate + running_delta
             return (showingdate, showingenddate)
     return (None, None)
@@ -110,6 +110,12 @@ def parse_listings_page(url):
 
 def parse_event_page(url):
     soup = parse_url(url)
+
+    try:
+        yearurl = soup.find('td', 'calendarToday').a['href']
+        eventyear = int(yearurl.split('/')[-1][:4])
+    except:
+        eventyear = datetime.today().year
 
     title = soup.find('h1', 'title').string
     precis = title.findNext('p', 'standfirst').string
@@ -155,7 +161,7 @@ def parse_event_page(url):
         for row in soup.find('table', id=re.compile('^showtimes_list')):
             dateelem = row.find('td')
             datestr = getattr(dateelem, 'string', None)
-            (showingdate, showingend) = parse_dates(datestr, running_delta)
+            (showingdate, showingend) = parse_dates(datestr, running_delta, eventyear)
             if showingdate and showingend:
                 showingloc = getattr(dateelem.findNextSiblings('td')[1], 'string', None)
                 bookelem = getattr(dateelem.findNextSiblings('td')[2], 'a', None)
@@ -165,7 +171,7 @@ def parse_event_page(url):
     else:
         dates_lines = soup.find('ul', {'class': re.compile('dates')})
         for dates_line in dates_lines.findAll('li'):
-            (showingdate, showingend) = parse_dates(dates_line.contents[0], running_delta)
+            (showingdate, showingend) = parse_dates(dates_line.contents[0], running_delta, eventyear)
             if showingdate and showingend:
                 showingloc = ''
                 for elem in dates_line.contents[0].rstrip().split()[::-1]:

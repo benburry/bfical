@@ -32,30 +32,25 @@ import urllib
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
 ereporter.register_logger()
 
-def generate_homepage(location='southbank'):
-    showings = db.Query(Showing).filter("master_location", location).filter("start >=", date.today()).order("start")
-    path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
-    return template.render(path, {"showings": showings,})
-
 class MainHandler(webapp.RequestHandler):
     def get(self, location='southbank'):
         cachekey = tasks.HOME_CACHEKEY_TMPL % location
         output = memcache.get(cachekey)
         if output is None:
-            output = generate_homepage(location)
+            output = tasks.generate_homepage(location)
             memcache.set(cachekey, output, time=86400)
         self.response.out.write(output)
 
 class ICSHandler(webapp.RequestHandler):
-    def get(self, location='southbank'):
+    def get(self, location='southbank', sublocation=None):
 
         calendar = None
         if not DEBUG:
-            calendar = memcache.get(tasks.ICS_CACHEKEY_TMPL % location)
+            calendar = memcache.get(tasks.ICS_CACHEKEY_TMPL % (location, sublocation))
 
         if calendar is None:
-            calendar = tasks.generate_calendar()
-            memcache.set(tasks.ICS_CACHEKEY_TMPL % location, calendar, time=86400)
+            calendar = tasks.generate_calendar(location, sublocation)
+            memcache.set(tasks.ICS_CACHEKEY_TMPL % (location, sublocation), calendar, time=86400)
 
         if calendar is not None:
             self.response.headers['Content-Type'] = "text/calendar"
@@ -99,7 +94,9 @@ def main():
     logging.getLogger().setLevel(logging.DEBUG)
 
     application = webapp.WSGIApplication([
-                                            (r'/calendar/([^\/]*)\.ics$', ICSHandler),
+                                            (r'/calendar/([^\/]*)/([^\/]*)/[^\/]+\.ics$', ICSHandler),
+                                            (r'/calendar/([^\/]*)/[^\/]+\.ics$', ICSHandler),
+                                            (r'/calendar/[^\/]+\.ics$', ICSHandler),
                                             (r'/event/([^\/]*)$', EventHandler),
                                             (r'/year/([^\/]*)$', YearHandler),
                                             (r'/more/([^\/]*)$', MoreHandler),

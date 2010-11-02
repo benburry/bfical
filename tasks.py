@@ -5,29 +5,40 @@ from google.appengine.api.labs import taskqueue
 from google.appengine.api import memcache
 from google.appengine.ext import db
 from google.appengine.ext import ereporter
+from google.appengine.ext.webapp import template
 from models import Event, Showing
 from datetime import date
 from icalendar.cal import Calendar, Event as CalEvent
 import time
 import logging
 import os
-import main
 
 ereporter.register_logger()
 
 DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv('SERVER_SOFTWARE') else False
 QUEUE_RETRY = 5
-ICS_CACHEKEY_TMPL = 'cal-%s'
-HOME_CACHEKEY_TMPL = 'home-%s'
 
-def generate_calendar(location = 'southbank'):
+ICS_CACHEKEY_TMPL = 'cal-%s-%s'
+HOME_CACHEKEY_TMPL = 'home-%s'
+LATCH_CACHEKEY_TMPL = 'lat-%s'
+
+def generate_homepage(location='southbank'):
+    showings = db.Query(Showing).filter("master_location", location).filter("start >=", date.today()).order("start")
+    path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
+    return template.render(path, {"showings": showings,})
+
+def generate_calendar(location = 'southbank', sublocation=None):
     calendar = Calendar()
     caplocation = location.capitalize()
     calendar.add('prodid', '-//BFiCal %s Calendar//bfical.com//' % caplocation)
     calendar.add('version', '2.0')
 
-    for showing in db.Query(Showing).filter("start >=", date.today()):
-        if showing.parent().location == location:
+    showings = db.Query(Showing).filter("start >=", date.today())
+    if sublocation is not None:
+        showings = showings.filter("location", sublocation)
+
+    for showing in showings:
+        if showing.master_location == location:
             calevent = CalEvent()
             calevent.add('uid', '%s@bfical.com' % showing.ident)
             calevent.add('summary', showing.parent().name)
@@ -52,7 +63,7 @@ class UpdateHandler(webapp.RequestHandler):
         return self.post()
 
     def post(self, location='southbank'):
-        memcache.set(ICS_CACHEKEY_TMPL % location, generate_calendar(location), time=1800)
+        memcache.set(ICS_CACHEKEY_TMPL % (location, None), generate_calendar(location, None), time=1800)
         listing_urls = BFIParser.generate_listing_urls()
         countdown = 1
         for url in listing_urls:
@@ -82,11 +93,14 @@ class ListingsHandler(webapp.RequestHandler):
         if continue_processing_task(self.request):
             urls = BFIParser.parse_listings_page(self.request.get('url'))
             countdown = 1
+            cachekey = LATCH_CACHEKEY_TMPL % time.time()
             for url in urls:
                 if memcache.get(url) is None:
                     memcache.set(url, 1, time=1800)
                     logging.debug("Queueing event url:%s" % url)
-                    taskqueue.add(url='/tasks/process_event_url', params={'url': url}, queue_name='background-queue', countdown=countdown)
+                    remaining = memcache.incr(cachekey, initial_value=0)
+                    logging.debug("Incremented remaining count to %s" % remaining)
+                    taskqueue.add(url='/tasks/process_event_url', params={'url': url, 'cachekey': cachekey}, queue_name='background-queue', countdown=countdown)
                     countdown = countdown + 1
                     self.response.out.write(url)
                 else:
@@ -95,19 +109,20 @@ class ListingsHandler(webapp.RequestHandler):
 class GenerateHandler(webapp.RequestHandler):
     def post(self):
         for location in BFIParser.LOCATIONS:
-            memcache.set(HOME_CACHEKEY_TMPL % location, main.generate_homepage(location), time=86400)
-            memcache.set(ICS_CACHEKEY_TMPL % location, generate_calendar(location), time=86400)
+            memcache.set(HOME_CACHEKEY_TMPL % location, generate_homepage(location), time=86400)
+            memcache.set(ICS_CACHEKEY_TMPL % (location, None), generate_calendar(location, None), time=86400)
 
 class EventHandler(webapp.RequestHandler):
     def post(self, location='southbank'):
         if continue_processing_task(self.request):
             eventurl = self.request.get('url')
+            cachekey = self.request.get('cachekey')
 
             logging.debug("Processing event url %s" % eventurl)
             # Parse page
             bfievent = BFIParser.parse_event_page(eventurl)
 
-            def persist_events(dbevent, bfievent):
+            def persist_showings(dbevent, bfievent):
                 # Delete existing showings for this event past current date
                 db.delete(db.Query(Showing).ancestor(dbevent).filter("start >=", date.today()))
 
@@ -125,17 +140,31 @@ class EventHandler(webapp.RequestHandler):
                                 end=showing.end).put()
 
             event = Event.get_or_insert(key_name=bfievent.url,
-                                        src_url=db.Link(bfievent.url),
-                                        name=bfievent.title,
-                                        precis=bfievent.precis,
-                                        year=bfievent.year,
-                                        directors=bfievent.directors,
-                                        cast=bfievent.cast,
-                                        description=bfievent.description)
+                                    src_url=db.Link(bfievent.url),
+                                    name=bfievent.title,
+                                    precis=bfievent.precis,
+                                    year=bfievent.year,
+                                    directors=bfievent.directors,
+                                    cast=bfievent.cast,
+                                    description=bfievent.description)
+            event.src_url=db.Link(bfievent.url)
+            event.name=bfievent.title
+            event.precis=bfievent.precis
+            event.year=bfievent.year
+            event.directors=bfievent.directors
+            event.cast=bfievent.cast
+            event.description=bfievent.description
+            event.put()
 
-            db.run_in_transaction(persist_events, event, bfievent)
-            memcache.delete(HOME_CACHEKEY_TMPL % location)
+            db.run_in_transaction(persist_showings, event, bfievent)
             logging.debug("Processed event url %s" % eventurl)
+
+            remaining = memcache.decr(cachekey, initial_value=0)
+            logging.debug("Decremented remaining count to %s" % remaining)
+            if remaining <= 0:
+                db.delete(db.Query(Showing).filter("updated <", date.today()))
+                db.delete(db.Query(Event).filter("updated <", date.today()))
+                memcache.delete(HOME_CACHEKEY_TMPL % location)
 
 
 def main():
