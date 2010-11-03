@@ -33,12 +33,16 @@ DEBUG = os.getenv('SERVER_SOFTWARE').split('/')[0] == "Development" if os.getenv
 ereporter.register_logger()
 
 class MainHandler(webapp.RequestHandler):
-    def get(self, location='southbank'):
-        cachekey = tasks.HOME_CACHEKEY_TMPL % location
-        output = memcache.get(cachekey)
+    def get(self, location='southbank', weekoffset=0):
+        output = None
+        weekoffset = int(weekoffset)
+        if weekoffset == 0:
+            cachekey = tasks.HOME_CACHEKEY_TMPL % location
+            output = memcache.get(cachekey)
         if output is None:
-            output = tasks.generate_homepage(location)
-            memcache.set(cachekey, output, time=86400)
+            output = tasks.generate_homepage(location, weekoffset)
+            if weekoffset == 0:
+                memcache.set(cachekey, output, time=86400)
         self.response.out.write(output)
 
 class ICSHandler(webapp.RequestHandler):
@@ -101,6 +105,7 @@ def main():
                                             (r'/year/([^\/]*)$', YearHandler),
                                             (r'/more/([^\/]*)$', MoreHandler),
                                             (r'/$', MainHandler),
+                                            (r'/(\w+)/(\d+)$', MainHandler),
                                          ], debug=DEBUG)
     util.run_wsgi_app(application)
 

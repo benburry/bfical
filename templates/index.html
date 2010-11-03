@@ -1,9 +1,19 @@
 {% extends "base.html" %}
+{% block header %}<link rel="alternate" type="text/calendar" href="/calendar/{{ location }}/{{ location }}.ics" />{% endblock %}
 {% block body %}
+<h3>Showings for {% ifequal page 0 %}this week{% else %}the week starting {{ startdate|date:"jS M" }}{% endifequal %}</h3>
+{% if showings %}
+<p>{% ifnotequal page 0 %}<a href="/{{ location }}/{{ page|add:"-1" }}">Prev</a> {% endifnotequal %}<a href="/{{ location }}/{{ page|add:"1" }}">Next</a> </p>
 <ul>{% for showing in showings %}
-    {% ifchanged showing.start.month %}
-    <li>{{ showing.start|date:"F" }}</li>
+    {% ifchanged showing.start.day %}
+    <li>{{ showing.start|date:"D jS M" }}</li>
     {% endifchanged %}
-    <li>{{ showing.start|date:"D jS H:i" }}-{{ showing.end|date:"D jS H:i" }} <a href="/event/{{ showing.parent.key }}">{{ showing.parent.name }}</a> {{ showing.location }}</li>
+    <li><a href="/event/{{ showing.parent.key }}">{{ showing.parent.name }}</a> {{ showing.start|date:"H:i" }}-{{ showing.end|date:"H:i" }} {{ showing.location }}</li>
 {% endfor %}</ul>
+    <p>{% ifnotequal page 0 %}<a href="/{{ location }}/{{ page|add:"-1" }}">Prev</a> {% endifnotequal %}<a href="/{{ location }}/{{ page|add:"1" }}">Next</a> </p>
+{% else %}
+    {% ifnotequal page 0 %}<p><a href="/{{ location }}/{{ page|add:"-1" }}">Prev</a> </p>{% endifnotequal %}
+    <p>No showings found</p>
+    {% ifnotequal page 0 %}<p><a href="/{{ location }}/{{ page|add:"-1" }}">Prev</a> </p>{% endifnotequal %}
+{% endif %}
 {% endblock %}

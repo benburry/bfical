@@ -7,7 +7,7 @@ from google.appengine.ext import db
 from google.appengine.ext import ereporter
 from google.appengine.ext.webapp import template
 from models import Event, Showing
-from datetime import date
+from datetime import date, timedelta
 from icalendar.cal import Calendar, Event as CalEvent
 import time
 import logging
@@ -20,12 +20,21 @@ QUEUE_RETRY = 5
 
 ICS_CACHEKEY_TMPL = 'cal-%s-%s'
 HOME_CACHEKEY_TMPL = 'home-%s'
-LATCH_CACHEKEY_TMPL = 'lat-%s'
+LATCH_CACHEKEY_TMPL = 'lat-%s-%s'
 
-def generate_homepage(location='southbank'):
-    showings = db.Query(Showing).filter("master_location", location).filter("start >=", date.today()).order("start")
+def generate_homepage(location='southbank', weekoffset=0):
+    today = date.today()
+
+    if weekoffset > 0:
+        startdate = today + timedelta((weekoffset * 7) - today.weekday())
+        enddate = startdate + timedelta(7)
+    else:
+        startdate = today
+        enddate = startdate + timedelta(7 - startdate.weekday())
+
+    showings = db.Query(Showing).filter("master_location", location).filter("start >=", startdate).filter("start <=", enddate).order("start").fetch(1000)
     path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
-    return template.render(path, {"showings": showings,})
+    return template.render(path, {"showings": showings, "location": location, "page": weekoffset, "startdate": startdate})
 
 def generate_calendar(location = 'southbank', sublocation=None):
     calendar = Calendar()
@@ -66,9 +75,10 @@ class UpdateHandler(webapp.RequestHandler):
         memcache.set(ICS_CACHEKEY_TMPL % (location, None), generate_calendar(location, None), time=1800)
         listing_urls = BFIParser.generate_listing_urls()
         countdown = 1
+        cachekey = LATCH_CACHEKEY_TMPL % (location, time.time())
         for url in listing_urls:
             logging.debug("Queueing listing url:%s" % url)
-            taskqueue.add(url='/tasks/process_listings_url', params={'url': url}, queue_name='background-queue', countdown=countdown)
+            taskqueue.add(url='/tasks/process_listings_url', params={'url': url, 'cachekey': cachekey}, queue_name='background-queue', countdown=countdown)
             countdown = countdown + 1
         self.response.out.write(listing_urls)
 
@@ -93,7 +103,7 @@ class ListingsHandler(webapp.RequestHandler):
         if continue_processing_task(self.request):
             urls = BFIParser.parse_listings_page(self.request.get('url'))
             countdown = 1
-            cachekey = LATCH_CACHEKEY_TMPL % time.time()
+            cachekey = self.request.get('cachekey')
             for url in urls:
                 if memcache.get(url) is None:
                     memcache.set(url, 1, time=1800)
