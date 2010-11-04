@@ -8,7 +8,7 @@
     {% ifchanged showing.start.day %}
     <li>{{ showing.start|date:"D jS M" }}</li>
     {% endifchanged %}
-    <li><a href="/event/{{ showing.parent.key }}">{{ showing.parent.name }}</a> {{ showing.start|date:"H:i" }}-{{ showing.end|date:"H:i" }} {{ showing.location }}</li>
+    <li>{{ showing.start|date:"H:i" }}-{{ showing.end|date:"H:i" }} <a href="/event/{{ showing.parent.key }}">{{ showing.parent.name }}</a> {{ showing.location }}</li>
 {% endfor %}</ul>
     <p>{% ifnotequal page 0 %}<a href="/{{ location }}/{{ page|add:"-1" }}">Prev</a> {% endifnotequal %}<a href="/{{ location }}/{{ page|add:"1" }}">Next</a> </p>
 {% else %}
