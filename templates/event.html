@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 {% block title %} BFiCal - {{ event.name }}{% endblock %}
 {% block body %}
-    <h1>{{ event.name }}</h1>
+    <ul><h4>{{ event.name }}</h4>
     <p>{{ event.precis }}</p>
-    <p>{{ event.description }}</p>
     {% if event.year %}<p>Year: <a href="/year/{{ event.year }}">{{ event.year }}</a></p>{% endif %}
     {% if event.directors %}<p>Director: {% for director in event.directors %}{% if not forloop.first %}, {% endif %}<a href="/more/{{ director|urlencode }}">{{ director }}</a>{% endfor %}</p>{% endif %}
     {% if event.cast %}<p>Cast: {% for member in event.cast %}{% if not forloop.first %}, {% endif %}<a href="/more/{{ member|urlencode }}">{{ member }}</a>{% endfor %}</p>{% endif %}
-    <ul>{% for showing in showings %}
+    {% for showing in showings %}
     {% ifchanged showing.start.day %}
-    <li>{{ showing.start|date:"D jS M" }}</li>
+    <h3>{{ showing.start|date:"D jS M" }}</h3>
     {% endifchanged %}
-    <li>{{ showing.start|date:"H:i" }}-{{ showing.end|date:"H:i" }} {{ showing.location }}</li>
-    {% endfor %}</ul>
-    <a href="{{ event.src_url }}" target="_blank">more...</a>
+    <li>
+        <div style="width: 150px; float: left;">{{ showing.start|date:"H:i" }}-{{ showing.end|date:"H:i" }} {{ showing.location }}</div>
+        <div><a href="/calendar/google/{{ showing.key }}" target="_blank"><img style="vertical-align: text-bottom;" src="/statics/images/goog_add.png" alt="Copy to Google Calendar" title="Copy to Google Calendar"/></a>
+        <a href="/calendar/{{ showing.key }}/showing.ics"><img style="vertical-align: text-bottom;" src="/statics/images/cal_add.png" alt="Copy to iCal" title="Copy to iCal"/></a></div>
+    </li>
+    {% endfor %}
+    <p><a href="{{ event.src_url }}" target="_blank">view on bfi.org.uk</a></p>   </ul>
 {% endblock %}

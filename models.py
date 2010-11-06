@@ -3,7 +3,7 @@ __author__ = 'ben'
 from google.appengine.ext import db
 
 class Showing(db.Model):
-    ident = db.StringProperty(required=True)
+    ident = db.StringProperty()
     location = db.StringProperty()
     master_location = db.StringProperty()
     start = db.DateTimeProperty(required=True)

@@ -45,23 +45,6 @@ class MainHandler(webapp.RequestHandler):
                 memcache.set(cachekey, output, time=86400)
         self.response.out.write(output)
 
-class ICSHandler(webapp.RequestHandler):
-    def get(self, location='southbank', sublocation=None):
-
-        calendar = None
-        if not DEBUG:
-            calendar = memcache.get(tasks.ICS_CACHEKEY_TMPL % (location, sublocation))
-
-        if calendar is None:
-            calendar = tasks.generate_calendar(location, sublocation)
-            memcache.set(tasks.ICS_CACHEKEY_TMPL % (location, sublocation), calendar, time=86400)
-
-        if calendar is not None:
-            self.response.headers['Content-Type'] = "text/calendar"
-            self.response.out.write(calendar.as_string())
-        else:
-            self.error(404)
-
 class EventHandler(webapp.RequestHandler):
     def get(self, eventkey):
         event = Event.get(eventkey)
@@ -98,9 +81,6 @@ def main():
     logging.getLogger().setLevel(logging.DEBUG)
 
     application = webapp.WSGIApplication([
-                                            (r'/calendar/([^\/]*)/([^\/]*)/[^\/]+\.ics$', ICSHandler),
-                                            (r'/calendar/([^\/]*)/[^\/]+\.ics$', ICSHandler),
-                                            (r'/calendar/[^\/]+\.ics$', ICSHandler),
                                             (r'/event/([^\/]*)$', EventHandler),
                                             (r'/year/([^\/]*)$', YearHandler),
                                             (r'/more/([^\/]*)$', MoreHandler),

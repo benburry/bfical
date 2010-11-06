@@ -19,6 +19,9 @@ handlers:
   script: $PYTHON_LIB/google/appengine/ext/ereporter/report_generator.py
   login: admin
 
+- url: /calendar/.*
+  script: calhandlers.py
+
 - url: .*
   script: main.py
 

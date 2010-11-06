@@ -6,6 +6,7 @@ from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
 from BeautifulSoup import BeautifulSoup
 import robotparser
+from pytz import timezone
 
 LISTING_BASE_URL = 'http://www.bfi.org.uk'
 LISTING_PATH_TMPL = '%s/whatson/calendar/southbank/day/%%s' % LISTING_BASE_URL
@@ -14,6 +15,8 @@ LOCATIONS = ['southbank',]
 
 USER_AGENT = 'BFiCal'
 robot_parser = None
+
+GB_TZ = timezone('Europe/London')
 
 class BFIEvent(object):
     def __init__(self, url=None, title=None, precis=None, description=None, directors=None, cast=None, year=None, showings=None):
@@ -69,7 +72,7 @@ def parse_dates(datestr='', running_delta=timedelta(minutes=1), year=datetime.to
     if match:
         showingdate = datetime.strptime(match.group(1), '%d %b %H:%M')
         if showingdate:
-            showingdate = showingdate.replace(year=year)
+            showingdate = showingdate.replace(year=year, tzinfo=GB_TZ)
             showingenddate = showingdate + running_delta
             return (showingdate, showingenddate)
     return (None, None)
@@ -158,7 +161,7 @@ def parse_event_page(url):
     showings = []
     showtimes_table = soup.find('table', id=re.compile('^showtimes_list'))
     if showtimes_table:
-        for row in soup.find('table', id=re.compile('^showtimes_list')):
+        for row in showtimes_table:
             dateelem = row.find('td')
             datestr = getattr(dateelem, 'string', None)
             (showingdate, showingend) = parse_dates(datestr, running_delta, eventyear)
@@ -174,12 +177,13 @@ def parse_event_page(url):
             (showingdate, showingend) = parse_dates(dates_line.contents[0], running_delta, eventyear)
             if showingdate and showingend:
                 showingloc = ''
+                showingid = None
                 for elem in dates_line.contents[0].rstrip().split()[::-1]:
                     if re.match(r'\d+:\d{2}', elem): break
-                    showingloc = ' '.join((showingloc, elem))
+                    showingloc = ' '.join((elem, showingloc))
                     showingloc = showingloc.lstrip()  # TODO: horrible, change
                     showingid = parse_ident(dates_line.contents[1]['href'])
-                    showings.append((showingid, showingloc, showingdate, showingend))
+                showings.append((showingid, showingloc, showingdate, showingend))
 
     logging.debug("Showings:%s" % len(showings))
     event = BFIEvent(url=url, title=title, precis=precis, directors=director_list, cast=cast_list, year=year, description=description)

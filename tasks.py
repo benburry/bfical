@@ -12,6 +12,7 @@ from icalendar.cal import Calendar, Event as CalEvent
 import time
 import logging
 import os
+import pytz
 
 ereporter.register_logger()
 
@@ -21,6 +22,8 @@ QUEUE_RETRY = 5
 ICS_CACHEKEY_TMPL = 'cal-%s-%s'
 HOME_CACHEKEY_TMPL = 'home-%s'
 LATCH_CACHEKEY_TMPL = 'lat-%s-%s'
+
+GB_TZ = pytz.timezone('Europe/London')
 
 def generate_homepage(location='southbank', weekoffset=0):
     today = date.today()
@@ -32,35 +35,44 @@ def generate_homepage(location='southbank', weekoffset=0):
         startdate = today
         enddate = startdate + timedelta(7 - startdate.weekday())
 
-    showings = db.Query(Showing).filter("master_location", location).filter("start >=", startdate).filter("start <=", enddate).order("start").fetch(1000)
+    showings = db.Query(Showing).filter("master_location", location).filter("start >=", startdate).filter("start <", enddate).order("start").fetch(1000)
     path = os.path.join(os.path.dirname(__file__), 'templates', 'index.html')
-    return template.render(path, {"showings": showings, "location": location, "page": weekoffset, "startdate": startdate})
+    return template.render(path, {"showings": showings, "location": location, "page": weekoffset, "startdate": startdate,})
 
-def generate_calendar(location = 'southbank', sublocation=None):
+def generate_ics(showings, location):
     calendar = Calendar()
     caplocation = location.capitalize()
     calendar.add('prodid', '-//BFiCal %s Calendar//bfical.com//' % caplocation)
     calendar.add('version', '2.0')
 
+    for showing in showings:
+        if showing.master_location == location:
+            calevent = CalEvent()
+            if showing.ident:
+                calevent.add('uid', '%s@bfical.com' % showing.ident)
+            else:
+                calevent.add('uid', '%s@bfical.com' % int(time.time()))
+            calevent.add('summary', showing.parent().name)
+            calevent.add('description', showing.parent().precis)
+            calevent.add('location', '%s, BFI %s, London' % (showing.location, caplocation))
+            calevent.add('dtstart', showing.start.replace(tzinfo=GB_TZ).astimezone(pytz.utc))
+            calevent.add('dtend', showing.end.replace(tzinfo=GB_TZ).astimezone(pytz.utc))
+            calevent.add('url', showing.parent().src_url)
+            calevent.add('sequence', int(time.time())) # TODO - fix
+            #calevent.add('dtstamp', datetime.datetime.now())
+
+            calendar.add_component(calevent)
+
+    return calendar
+
+
+def generate_calendar(location = 'southbank', sublocation=None):
     showings = db.Query(Showing).filter("start >=", date.today())
     if sublocation is not None:
         showings = showings.filter("location", sublocation)
 
-    for showing in showings:
-        if showing.master_location == location:
-            calevent = CalEvent()
-            calevent.add('uid', '%s@bfical.com' % showing.ident)
-            calevent.add('summary', showing.parent().name)
-            calevent.add('description', showing.parent().description)
-            calevent.add('location', '%s, %s' % (showing.location, caplocation))
-            calevent.add('dtstart', showing.start)
-            calevent.add('dtend', showing.end)
-            calevent.add('url', showing.parent().src_url)
-            calevent.add('sequence', int(time.time())) # TODO - fix
-            #calevent.add('dtstamp', datetime.datetime.now())
-            calendar.add_component(calevent)
+    return generate_ics(showings, location)
 
-    return calendar
 
 def continue_processing_task(request):
     retrycount = request.headers['X-AppEngine-TaskRetryCount']
@@ -90,6 +102,8 @@ class PurgeHandler(webapp.RequestHandler):
         self.post()
 
     def post(self):
+        memcache.flush_all()
+
         db.delete(Showing.all())
         db.delete(Event.all())
 
@@ -133,30 +147,26 @@ class EventHandler(webapp.RequestHandler):
             bfievent = BFIParser.parse_event_page(eventurl)
 
             def persist_showings(dbevent, bfievent):
-                # Delete existing showings for this event past current date
-                db.delete(db.Query(Showing).ancestor(dbevent).filter("start >=", date.today()))
+                # Delete existing showings for this event
+                db.delete(db.Query(Showing).ancestor(dbevent))
 
                 # Save events
                 for showing in bfievent.showings:
-                    if showing.id:  # TODO - how to store fully-booked showings?
-#                        db.delete(Showing.get_by_key_name(showing.id))
-
-                        Showing(key_name=showing.id,
-                                parent=dbevent,
-                                ident=showing.id,
-                                location=showing.location,
-                                master_location=location,
-                                start=showing.start,
-                                end=showing.end).put()
+                    Showing(parent=dbevent,
+                            ident=showing.id,
+                            location=showing.location,
+                            master_location=location,
+                            start=showing.start,
+                            end=showing.end).put()
 
             event = Event.get_or_insert(key_name=bfievent.url,
-                                    src_url=db.Link(bfievent.url),
-                                    name=bfievent.title,
-                                    precis=bfievent.precis,
-                                    year=bfievent.year,
-                                    directors=bfievent.directors,
-                                    cast=bfievent.cast,
-                                    description=bfievent.description)
+                                        src_url=db.Link(bfievent.url),
+                                        name=bfievent.title,
+                                        precis=bfievent.precis,
+                                        year=bfievent.year,
+                                        directors=bfievent.directors,
+                                        cast=bfievent.cast,
+                                        description=bfievent.description)
             event.src_url=db.Link(bfievent.url)
             event.name=bfievent.title
             event.precis=bfievent.precis

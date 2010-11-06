@@ -9,7 +9,7 @@ __license__ = "PSF License"
 
 import itertools
 import datetime
-import calendar
+import calhandlers
 import thread
 import sys
 
@@ -249,7 +249,7 @@ class rrule(rrulebase):
             until = datetime.datetime.fromordinal(until.toordinal())
         self._until = until
         if wkst is None:
-            self._wkst = calendar.firstweekday()
+            self._wkst = calhandlers.firstweekday()
         elif type(wkst) is int:
             self._wkst = wkst
         else:
@@ -612,7 +612,7 @@ class rrule(rrulebase):
                 timeset = gettimeset(hour, minute, second)
 
             if fixday and day > 28:
-                daysinmonth = calendar.monthrange(year, month)[1]
+                daysinmonth = calhandlers.monthrange(year, month)[1]
                 if day > daysinmonth:
                     while day > daysinmonth:
                         day -= daysinmonth
@@ -623,7 +623,7 @@ class rrule(rrulebase):
                             if year > datetime.MAXYEAR:
                                 self._len = total
                                 return
-                        daysinmonth = calendar.monthrange(year, month)[1]
+                        daysinmonth = calhandlers.monthrange(year, month)[1]
                     ii.rebuild(year, month)
 
 class _iterinfo(object):
@@ -641,8 +641,8 @@ class _iterinfo(object):
         # Every mask is 7 days longer to handle cross-year weekly periods.
         rr = self.rrule
         if year != self.lastyear:
-            self.yearlen = 365+calendar.isleap(year)
-            self.nextyearlen = 365+calendar.isleap(year+1)
+            self.yearlen = 365+calhandlers.isleap(year)
+            self.nextyearlen = 365+calhandlers.isleap(year+1)
             firstyday = datetime.date(year, 1, 1)
             self.yearordinal = firstyday.toordinal()
             self.yearweekday = firstyday.weekday()
@@ -718,7 +718,7 @@ class _iterinfo(object):
                     if -1 not in rr._byweekno:
                         lyearweekday = datetime.date(year-1,1,1).weekday()
                         lno1wkst = (7-lyearweekday+rr._wkst)%7
-                        lyearlen = 365+calendar.isleap(year-1)
+                        lyearlen = 365+calhandlers.isleap(year-1)
                         if lno1wkst >= 4:
                             lno1wkst = 0
                             lnumweeks = 52+(lyearlen+
