@@ -8,15 +8,19 @@ builtins:
 - admin_redirect: on
 
 handlers:
+- url: /_ereporter.*
+  script: $PYTHON_LIB/google/appengine/ext/ereporter/report_generator.py
+  login: admin
+
+- url: /admin/.*
+  script: $PYTHON_LIB/google/appengine/ext/admin
+  login: admin
+
 - url: /statics
   static_dir: statics
 
 - url: /tasks/.*
   script: tasks.py
-  login: admin
-
-- url: /_ereporter.*
-  script: $PYTHON_LIB/google/appengine/ext/ereporter/report_generator.py
   login: admin
 
 - url: /calendar/.*

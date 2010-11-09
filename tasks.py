@@ -94,8 +94,6 @@ class UpdateHandler(webapp.RequestHandler):
             countdown = countdown + 1
         self.response.out.write(listing_urls)
 
-        taskqueue.add(url='/tasks/generate_calendar', countdown=1800)
-
 
 class PurgeHandler(webapp.RequestHandler):
     def get(self):
@@ -185,6 +183,7 @@ class EventHandler(webapp.RequestHandler):
                 db.delete(db.Query(Showing).filter("updated <", date.today()))
                 db.delete(db.Query(Event).filter("updated <", date.today()))
                 memcache.delete(HOME_CACHEKEY_TMPL % location)
+                taskqueue.add(url='/tasks/generate_calendar')
 
 
 def main():
