@@ -18,17 +18,20 @@
 </script>
 </head>
 <body>
-<h1 id="logo"><a href="/"><span>An overview of what's on at the BFI</span></a></h1>
+<div id="logo"><a href="/"><span>An overview of what's on at the BFI</span></a></div>
 
 <div class="clear"></div>
 
 <div id="container">
-<h2 id="top">The full BFI schedule for importing into iCal or Google Calendar is available <a href="/calendar/southbank/southbank.ics">here</a>. </h2>
+{% block containertop %}<h2 id="top">The full BFI schedule for importing into iCal or Google Calendar is available <a href="/calendar/southbank/southbank.ics">here</a>. </h2>{% endblock %}
 <div id="content">
 {% block body %}{% endblock %}
 </div>
 <div class="clear"></div>
-<p id="bottom">BFiCal was created by <a href="http://github.com/benburry">Ben Burry</a></p>
+<div id="bottom">
+    <div style="float: left;">BFiCal was created by <a href="http://github.com/benburry">Ben Burry</a></div>
+    <div style="float: right;"><a href="/about">About</a></div>
+</div>
 </div>
 </body>
 </html>

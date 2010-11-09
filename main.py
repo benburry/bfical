@@ -60,11 +60,16 @@ class MoreHandler(webapp.RequestHandler):
         path = os.path.join(os.path.dirname(__file__), 'templates', 'events.html')
         self.response.out.write(template.render(path, {"events": events, "more": more,}))
 
+class DirectToTemplateHandler(webapp.RequestHandler):
+    def get(self, templatename):
+        self.response.out.write(template.render(os.path.join(os.path.dirname(__file__), 'templates', '%s.html' % templatename), {}))
+
 def main():
     #logging.getLogger().setLevel(logging.DEBUG if DEBUG else logging.WARN)
     logging.getLogger().setLevel(logging.DEBUG)
 
     application = webapp.WSGIApplication([
+                                            (r'/(about)$', DirectToTemplateHandler),
                                             (r'/event/([^\/]*)$', EventHandler),
                                             (r'/year/([^\/]*)$', YearHandler),
                                             (r'/more/([^\/]*)$', MoreHandler),

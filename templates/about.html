@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %} BFiCal - About{% endblock %}
+{% block containertop %}{% endblock %}
+{% block body %}
+<h4>About</h4>
+<p>BFiCal is an appengine application that generates an icalendar version of the BFI listings (currently only for the southbank) by screenscraping <a href="http://www.bfi.org.uk/">bfi.org.uk</a>. The intention is that you can import this .ics file into something that does calendars properly. And iCal. snark.</p>
+<p>The same data is used to generate this site, letting you navigate the listings by day/week, view listing by year/participant and save calendar reminders for individual showings.</p>
+<p>One day the BFI might offer a datafeed. I can dream.</p>
+<h4>Why</h4>
+<p>I love the BFI, but I find their website incredibly frustrating to navigate. BFiCal is an attempt to make that process easier.</p>
+<p>I'm keeping the number/frequency of data requests to a reasonably low level - the spider uses a custom user-agent and honours robots.txt if that were to ever become a problem.</p>
+<h4>Who</h4>
+<p>BFiCal was created by Ben Burry, with styles and graphics by Alexandra Deschamps-Sonsino. Thanks Alex.</p>
+{% endblock %}

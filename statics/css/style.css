@@ -127,12 +127,17 @@ h2#top a	 {
 	font-weight: bold;
 	}
 
-p#bottom {
+div#bottom {
 	font: 12px arial, verdana, sans-serif;
 	color: #808080;
 	border-top: 1px solid #001C55;
 	padding: 20px 0 0 0;
 	margin: 30px 0 0 0;
+	}
+
+div#bottom a {
+	color: #001C55;
+	text-decoration: none;
 	}
 
 div.pnav {
