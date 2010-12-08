@@ -113,7 +113,7 @@ class PurgeHandler(webapp.RequestHandler):
 class ListingsHandler(webapp.RequestHandler):
     def post(self):
         if continue_processing_task(self.request):
-            urls = BFIParser.parse_listings_page(self.request.get('url'))
+            (year, urls) = BFIParser.parse_listings_page(self.request.get('url'))
             countdown = 1
             cachekey = self.request.get('cachekey')
             for url in urls:
@@ -122,7 +122,7 @@ class ListingsHandler(webapp.RequestHandler):
                     logging.debug("Queueing event url:%s" % url)
                     remaining = memcache.incr(cachekey, initial_value=0)
                     logging.debug("Incremented remaining count to %s" % remaining)
-                    taskqueue.add(url='/tasks/process_event_url', params={'url': url, 'cachekey': cachekey}, queue_name='background-queue', countdown=countdown)
+                    taskqueue.add(url='/tasks/process_event_url', params={'url': url, 'cachekey': cachekey, 'eventyear': year}, queue_name='background-queue', countdown=countdown)
                     countdown = countdown + 1
                     self.response.out.write(url)
                 else:
@@ -138,11 +138,12 @@ class EventHandler(webapp.RequestHandler):
     def post(self, location='southbank'):
         if continue_processing_task(self.request):
             eventurl = self.request.get('url')
+            eventyear = self.request.get('eventyear')
             cachekey = self.request.get('cachekey')
 
-            logging.debug("Processing event url %s" % eventurl)
+            logging.debug("Processing event url %s for year %s" % (eventurl, eventyear))
             # Parse page
-            bfievent = BFIParser.parse_event_page(eventurl)
+            bfievent = BFIParser.parse_event_page(eventurl, eventyear)
 
             def persist_showings(dbevent, bfievent):
                 # Delete existing showings for this event

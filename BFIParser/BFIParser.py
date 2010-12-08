@@ -105,20 +105,15 @@ def generate_listing_urls():
 
 def parse_listings_page(url):
     soup = parse_url(url)
+    eventyear = int(url.split('/')[-1][:4])
 
     events = []
     for listing in soup.findAll('li', 'event'):
         events.append(LISTING_BASE_URL + listing.a['href'])
-    return events
+    return (eventyear, events)
 
-def parse_event_page(url):
+def parse_event_page(url, eventyear=datetime.today().year):
     soup = parse_url(url)
-
-    try:
-        yearurl = soup.find('td', 'calendarToday').a['href']
-        eventyear = int(yearurl.split('/')[-1][:4])
-    except:
-        eventyear = datetime.today().year
 
     title = soup.find('h1', 'title').string
     precis = title.findNext('p', 'standfirst').string

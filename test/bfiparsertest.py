@@ -1,4 +1,4 @@
-from BFIParser.BFIParser import parse_event_page, parse_listings_page
+from BFIParser.BFIParser import parse_event_page, parse_listings_page, generate_listing_urls
 
 __author__ = 'ben'
 
@@ -18,19 +18,20 @@ TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/nov
 TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/film_programme/regular_strands/studio_screenings/metropolis'
 #TEST_EVENT_URL = 'http://www.bfi.org.uk/whatson/bfi_southbank/events/misfits_character_workshop'
 
-TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20101119'
-TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/imax/day/20101116'
+TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/southbank/day/20110112'
+#TEST_LISTING_URL = 'http://www.bfi.org.uk/whatson/calendar/imax/day/20101116'
 
 if __name__ == '__main__':
-#    urls = parse_listings_page(TEST_LISTING_URL)
-#    for url in urls:
-#        print unicode(url)
-#        event = parse_event_page(unicode(url))
-#        print unicode(event)
-#        for showing in event.showings:
-#            print unicode(showing)
-    event = parse_event_page(TEST_EVENT_URL)
-    print unicode(event)
-    for showing in event.showings:
-        print unicode(showing)
+    (year, urls) = parse_listings_page(TEST_LISTING_URL)
+#    urls = generate_listing_urls()
+    for url in urls:
+        print unicode(url), year
+        event = parse_event_page(unicode(url), year)
+        print unicode(event)
+        for showing in event.showings:
+            print unicode(showing)
+#    event = parse_event_page(TEST_EVENT_URL)
+#    print unicode(event)
+#    for showing in event.showings:
+#        print unicode(showing)
 
