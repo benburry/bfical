@@ -138,7 +138,7 @@ class EventHandler(webapp.RequestHandler):
     def post(self, location='southbank'):
         if continue_processing_task(self.request):
             eventurl = self.request.get('url')
-            eventyear = self.request.get('eventyear')
+            eventyear = int(self.request.get('eventyear'))
             cachekey = self.request.get('cachekey')
 
             logging.debug("Processing event url %s for year %s" % (eventurl, eventyear))
